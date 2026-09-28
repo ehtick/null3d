@@ -15,7 +15,21 @@ describe('checkDocsStyle errors', () => {
 	it('blocks any mention of the private build plan, even in code', () => {
 		expect(rules('Read `.dev/plan/x.md`.')).toEqual(['error:private_plan:1']);
 		expect(rules('| Plan | `PLAN.md` |')).toEqual(['error:private_plan:1']);
-		expect(rules('See https://sokko3d.dev/docs.')).toEqual([]);
+		expect(rules('See https://null3d.dev/docs.')).toEqual([]);
+	});
+
+	it('blocks the build process in docs for engine users', () => {
+		expect(rules('The first milestone adds shadows.')).toEqual(['error:build_process:1']);
+		expect(rules('These figures come from the checkpoint.')).toEqual(['error:build_process:1']);
+		expect(rules('Task M0-J1 wrote this page.')).toEqual(['error:build_process:1']);
+	});
+
+	it('lets contributor files name the build process, but not the private plan', () => {
+		const contributors = (md: string) =>
+			checkDocsStyle(md, 'contributors').map((f) => `${f.severity}:${f.rule}:${f.line}`);
+		expect(contributors('Add the milestone task ID, such as M0-J1.')).toEqual([]);
+		expect(contributors('M1 adds shadows.')).toEqual([]);
+		expect(contributors('Read `.dev/plan/x.md`.')).toEqual(['error:private_plan:1']);
 	});
 
 	it('ignores front matter, fenced code, inline code and comments', () => {
@@ -42,6 +56,11 @@ describe('checkDocsStyle warnings', () => {
 		expect(rules('It is not just fast but also small.')).toEqual(['warning:not_x_but_y:1']);
 	});
 
+	it('warns on a bare milestone name, but not on an Apple chip', () => {
+		expect(rules('M1 adds shadows.')).toEqual(['warning:milestone_name:1']);
+		expect(rules('It runs on an Apple M1 laptop.')).toEqual([]);
+	});
+
 	it('joins wrapped lines into one paragraph and reports its first line', () => {
 		const words = Array.from({ length: 15 }, () => 'word').join(' ');
 		expect(rules(`Intro.\n\n${words}\n${words}.`)).toEqual(['warning:long_sentence:3']);
@@ -55,7 +74,7 @@ describe('checkDocsStyle warnings', () => {
 
 	it('ends a sentence before a name spelled in lowercase', () => {
 		const words = Array.from({ length: 15 }, () => 'word').join(' ');
-		expect(rules(`${words}. sokko3d ${words}. three.js ${words}.`)).toEqual([]);
+		expect(rules(`${words}. null3d ${words}. three.js ${words}.`)).toEqual([]);
 	});
 
 	it('does not split sentences at version numbers or skip table rows for errors', () => {
@@ -66,8 +85,8 @@ describe('checkDocsStyle warnings', () => {
 
 describe('isTitleCase', () => {
 	it('flags title case and leaves sentence case and product names alone', () => {
-		expect(isTitleCase('Getting Started With Sokko')).toBe(true);
-		expect(isTitleCase('Getting started with sokko3d')).toBe(false);
+		expect(isTitleCase('Getting Started With Null')).toBe(true);
+		expect(isTitleCase('Getting started with null3d')).toBe(false);
 		expect(isTitleCase('Porting React Three Fiber')).toBe(false);
 		expect(isTitleCase('GPU tiers and backends')).toBe(false);
 	});

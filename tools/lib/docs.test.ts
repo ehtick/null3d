@@ -20,7 +20,7 @@ const repoRoot = join(import.meta.dir, '../..');
 
 const MAPPING = JSON.stringify({
 	statusLegend: { direct: 'Same.' },
-	sinceLegend: { '0.1': 'milestone M1' },
+	sinceLegend: { '0.1': 'the core renderer' },
 	entries: [],
 });
 const INDEX = `${renderFrontMatter([
@@ -29,7 +29,7 @@ const INDEX = `${renderFrontMatter([
 	['status', 'experimental'],
 	['since', '0.1'],
 	['summary', 'The docs.'],
-])}\n# Docs\n\n<!-- sokko3d:page-list:start -->\n<!-- sokko3d:page-list:end -->\n`;
+])}\n# Docs\n\n<!-- null3d:page-list:start -->\n<!-- null3d:page-list:end -->\n`;
 const NO_API: ApiReference = { symbols: [], problems: [] };
 const SET_THING: ApiSymbol = {
 	name: 'setThing',
@@ -146,7 +146,7 @@ describe('generateDocs', () => {
 			'docs/index.md': INDEX,
 			'docs/data/threejs-mapping.json': MAPPING,
 			'docs/concepts/handles.md': written,
-			'docs/concepts/architecture.md': '<!-- sokko3d:placeholder -->\nold text',
+			'docs/concepts/architecture.md': '<!-- null3d:placeholder -->\nold text',
 		});
 		const out = generateDocs(root, NO_API);
 		expect(out.has('docs/concepts/handles.md')).toBe(false);
@@ -167,20 +167,20 @@ describe('generateDocs', () => {
 		const root = fixture({
 			'docs/index.md': INDEX,
 			'docs/data/threejs-mapping.json': MAPPING,
-			'docs/api/scene.md': '<!-- sokko3d:placeholder -->\nold text',
+			'docs/api/scene.md': '<!-- null3d:placeholder -->\nold text',
 			'docs/api/objects.md': writtenObjects(`${API_START}\nSTALE REFERENCE\n${API_END}`),
 		});
 		const out = generateDocs(root, { symbols: [SET_THING, THING], problems: [] });
 		const scene = out.get('docs/api/scene.md') ?? '';
 		expect(scene).toContain('No release has these APIs yet');
-		expect(scene).toContain('## API reference\n\nThis reference is generated');
+		expect(scene).toContain('## API reference\n\n### `setThing`');
 		expect(scene).toContain('### `setThing`');
 		const objects = out.get('docs/api/objects.md') ?? '';
-		expect(objects).toContain(`${API_START}\n\nThis reference is generated`);
+		expect(objects).toContain(`${API_START}\n\n### `);
 		expect(objects).toContain('### `Thing`');
 		expect(objects).not.toContain('STALE REFERENCE');
 		expect(objects).toContain('More text.');
-		expect(out.get('docs/api/lights.md')).toContain('the feature is designed but not built yet');
+		expect(out.get('docs/api/lights.md')).toContain('No release has this feature yet');
 	});
 
 	it('fails when a written page with exports has no reference markers', () => {

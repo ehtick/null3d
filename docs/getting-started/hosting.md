@@ -8,7 +8,7 @@ summary: "COOP and COEP headers; require-corp on Safari; CORS and CORP for asset
 
 # Hosting and cross-origin isolation
 
-> Planned for sokko3d 0.1. This page describes the design. The first milestone implements parts of it in this repository, but no release has these APIs yet, so coding agents must not use them.
+> Planned for null3d 0.1. No release has these APIs yet, so coding agents must not use them.
 
 ```mermaid
 flowchart TD
@@ -17,7 +17,7 @@ flowchart TD
     check -- "no" --> single["Single-threaded build<br/>the same code on one thread"]
 ```
 
-sokko3d runs on worker threads that share memory, and browsers allow shared memory only on pages that are cross-origin isolated. A page becomes isolated when its server sends two HTTP headers. Without them the engine still runs, on one thread.
+null3d runs on worker threads that share memory, and browsers allow shared memory only on pages that are cross-origin isolated. A page becomes isolated when its server sends two HTTP headers. Without them the engine still runs, on one thread.
 
 ## The two headers
 
@@ -43,7 +43,7 @@ Files from the page's own origin need nothing. Serve the engine's own files, the
 
 ## Two builds
 
-A WebAssembly module built for shared memory cannot load on a page without it, so sokko3d ships two builds. The engine's loader reads `crossOriginIsolated` and fetches the matching one, so you never pick a build yourself.
+A WebAssembly module built for shared memory cannot load on a page without it, so null3d ships two builds. The engine's loader reads `crossOriginIsolated` and fetches the matching one, so you never pick a build yourself.
 
 | Build | Loaded when | What you get |
 | --- | --- | --- |
@@ -85,13 +85,29 @@ add_header Cross-Origin-Opener-Policy same-origin always;
 add_header Cross-Origin-Embedder-Policy require-corp always;
 ```
 
-GitHub Pages cannot send custom headers, so a sokko3d page there runs single-threaded.
+GitHub Pages cannot send custom headers, so a null3d page there runs single-threaded.
 
 ## During development
 
-The sokko3d dev server and the Vite plugin send both headers on every response, including `.wasm` files and worker scripts.
+The null3d Vite plugin sends both headers on every response from `vite` and `vite preview`, including `.wasm` files and worker scripts.
 
-Shared memory and WebGPU also need a secure context: HTTPS, or `localhost`. To test on a phone over your local network, use `sokko3d dev --https`, which serves HTTPS with a local certificate. An Android phone connected by USB can instead reach your computer's `localhost` through `adb reverse`.
+Shared memory and WebGPU also need a secure context: HTTPS, or `localhost`. An Android phone connected by USB can reach your computer's `localhost` through `adb reverse tcp:5173 tcp:5173`.
+
+To test on a phone or tablet over your local network, serve HTTPS with a local certificate. Make one with [mkcert](https://github.com/FiloSottile/mkcert), for `localhost` and your computer's network name:
+
+```sh
+mkdir certs
+mkcert -cert-file certs/cert.pem -key-file certs/key.pem localhost my-computer.local
+```
+
+Keep the `certs` folder out of version control, because it holds a private key. Turn on the plugin's `https` option, and the dev server serves HTTPS on your local network:
+
+```ts
+// vite.config.ts
+export default defineConfig({ plugins: [null3d({ https: true, certDir: 'certs' })] });
+```
+
+The device must trust mkcert's root certificate. `mkcert -CAROOT` prints its folder. Copy `rootCA.pem` to the device and install it. On an iPhone or iPad, also turn on full trust in Settings > General > About > Certificate Trust Settings.
 
 ## What isolation changes
 

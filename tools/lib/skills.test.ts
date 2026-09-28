@@ -36,21 +36,21 @@ describe('checkSkills', () => {
 		const root = fixture({
 			'docs/concepts/handles.md': PAGE,
 			'docs/data/threejs-mapping.json': JSON.stringify({ entries: [] }),
-			'skills/sokko3d-port-threejs/SKILL.md': skill('See `concepts/handles`.').replace(
+			'skills/null3d-port-threejs/SKILL.md': skill('See `concepts/handles`.').replace(
 				'demo-skill',
-				'sokko3d-port-threejs',
+				'null3d-port-threejs',
 			),
-			'skills/sokko3d-port-threejs/evals/evals.json': EVALS.replace(
+			'skills/null3d-port-threejs/evals/evals.json': EVALS.replace(
 				'demo-skill',
-				'sokko3d-port-threejs',
+				'null3d-port-threejs',
 			),
-			'skills/sokko3d-port-threejs/references/threejs-mapping.json': JSON.stringify({
+			'skills/null3d-port-threejs/references/threejs-mapping.json': JSON.stringify({
 				entries: [{ docs: 'concepts/handles' }],
 			}),
 		});
 		syncSkills(root);
 		expect(checkSkills(root).problems).toEqual([
-			'skills/sokko3d-port-threejs/references/threejs-mapping.json differs from docs/data/threejs-mapping.json: run bun run docs',
+			'skills/null3d-port-threejs/references/threejs-mapping.json differs from docs/data/threejs-mapping.json: run bun run docs',
 		]);
 	});
 
@@ -80,6 +80,17 @@ describe('checkSkills', () => {
 		syncSkills(root);
 		expect(checkSkills(root).problems).toEqual([
 			"skills/demo-skill/SKILL.md points at the maintainers' private build plan",
+		]);
+	});
+
+	it('fails when a skill names the build process', () => {
+		const root = fixture({
+			'skills/demo-skill/SKILL.md': skill('The first milestone adds this call.'),
+			'skills/demo-skill/evals/evals.json': EVALS,
+		});
+		syncSkills(root);
+		expect(checkSkills(root).problems).toEqual([
+			"skills/demo-skill/SKILL.md names the maintainers' build process (milestones, checkpoints or task IDs)",
 		]);
 	});
 
