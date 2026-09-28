@@ -12,6 +12,7 @@ Measure first, then change one thing, then measure again. Read `guides/performan
 6. Memory
 7. The quality governor and your own systems
 8. Per-frame code that allocates nothing
+9. Objects during play
 
 ## 1. Where frame time goes
 
@@ -60,6 +61,7 @@ These numbers are starting points. The engine docs page `guides/performance` hol
 | High "culling" on WebGL2 | Many objects checked on the CPU | Instances; larger static groups; layer masks; LODs |
 | Objects behind walls or buildings still cost GPU time on WebGL2 | No blocker meshes | Run the asset tool on level geometry so it makes blocker meshes (0.2); call `setOccluder(true)` on large custom walls (`concepts/culling`) |
 | High "upload" bytes | Dynamic batches or objects that rarely change | Static batches with `markDirty(start, count)` for the rows that changed |
+| `rebuilds` above zero during play, with upload and replay spikes in the same frames | Objects, meshes, materials or batches created, destroyed or changed during play: each such frame rebuilds the draw tables and uploads every matrix | Create during setup; hide and show with `setVisible` and pool with `setActiveCount`, which do not rebuild (`guides/performance`) |
 | High "replay" or draw buckets | Too many mesh and material combinations | Share materials; pack textures into arrays with `null3d assets`; merge small static meshes offline |
 | GPU time high, CPU low | Pixels or shader cost | Lower `maxPixelRatio`; cheaper materials; fewer shadowed lights; avoid large transparent areas |
 | Hitch when something new appears | Pipeline compiled during play | Create materials and objects during loading; `await scene.warmUp()` |
@@ -113,3 +115,14 @@ Apply these habits to `onUpdate` and everything it calls.
 - Make no closures, `async` wrappers or promise chains per frame. Keep closures out of per-frame functions even in a branch that rarely runs: until the browser optimizes the function, the variables a closure captures are allocated on every call. Move such a branch into its own function.
 - Animate a light with `setIntensity` and `setDirection`, which allocate nothing. `setColor` converts the color and allocates.
 - Judge allocation after about 30 seconds of play. Until the browser optimizes a function that runs once per frame, the decimal numbers it computes are allocated.
+
+## 9. Objects during play
+
+Some calls rebuild the scene's draw tables in the frame they take effect: the bundle is recorded again and every matrix uploads. Others upload only what they changed. The engine docs page `guides/performance` has the full table.
+
+- Cheap: moving objects, writing batch arrays, `setVisible`, and `setActiveCount`.
+- Rebuilds: creating or destroying objects and batches, `setMesh`, `setMaterial`, `setParent` and `setDynamic`.
+- Create everything a level needs during setup. Hide with `setVisible` instead of destroying.
+- Pool bullets, particles and pickups in a batch sized for its most rows. Show the live ones with `setActiveCount`, and keep them at the front of the arrays.
+- For a look that changes often, such as a highlight, keep two objects and swap their visibility.
+- Check `engine.measure()`: `rebuilds` above zero during play means one of the rebuilding calls ran.
