@@ -132,9 +132,9 @@
 
     "@null3d/bench": ["@null3d/bench@workspace:bench"],
 
-    "@null3d/engine": ["@null3d/engine@workspace:packages/engine"],
-
     "@null3d/cli": ["@null3d/cli@workspace:packages/cli"],
+
+    "@null3d/engine": ["@null3d/engine@workspace:packages/engine"],
 
     "@null3d/tests": ["@null3d/tests@workspace:tests"],
 
