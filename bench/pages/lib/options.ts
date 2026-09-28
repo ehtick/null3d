@@ -1,0 +1,86 @@
+// The address switches that benchmark pages share. Each check fails with a message that says how to
+// fix the address, and the page publishes that message as its error.
+
+import { HOLD_TIME } from '../../scenes/spec';
+
+export interface RunOptions {
+	/**
+	 * `?hold`: render one frame and publish its pixels, instead of a timed run. The value is the
+	 * scene time to draw: `?hold=3.5`, or the scene module's hold time for a bare `?hold`. Null
+	 * without the switch.
+	 */
+	hold: number | null;
+	/** `?demo`: run the scene until the page closes, with no measurement. */
+	demo: boolean;
+	/** `?n=`: the instance count, or null to use the scene's default. */
+	count: number | null;
+	/** `?seconds=`: the warm-up and the measured time of a run, or null to use the protocol's. */
+	seconds: number | null;
+}
+
+/** The value of a switch that must be one of a few words. */
+export function readChoice<T extends string>(
+	params: URLSearchParams,
+	name: string,
+	choices: readonly T[],
+): T {
+	const value = params.get(name);
+	const choice = choices.find((c) => c === value);
+	if (choice === undefined) {
+		const options = choices.map((c) => `?${name}=${c}`).join(' or ');
+		throw new Error(
+			value === null
+				? `Add ${options} to the page address.`
+				: `"${value}" is not a valid ${name}. Use ${options}.`,
+		);
+	}
+	return choice;
+}
+
+function readNumber(
+	params: URLSearchParams,
+	name: string,
+	valid: (value: number) => boolean,
+	expected: string,
+): number | null {
+	const text = params.get(name);
+	if (text === null) return null;
+	const value = Number(text);
+	if (text.trim() === '' || !valid(value)) {
+		throw new Error(`?${name}=${text} is not valid: use ${expected}, for example ?${name}=2.`);
+	}
+	return value;
+}
+
+/** The name a page publishes its result under: `hold`, `demo` or `bench`. */
+export function pageReport(params: URLSearchParams): 'hold' | 'demo' | 'bench' {
+	return params.has('hold') ? 'hold' : params.has('demo') ? 'demo' : 'bench';
+}
+
+/** Reads `?hold`, `?demo`, `?n=` and `?seconds=`. */
+export function readRunOptions(params: URLSearchParams): RunOptions {
+	return {
+		hold:
+			params.get('hold') === ''
+				? HOLD_TIME
+				: readNumber(
+						params,
+						'hold',
+						(v) => Number.isFinite(v) && v >= 0,
+						'a scene time in seconds, 0 or more',
+					),
+		demo: params.has('demo'),
+		count: readNumber(
+			params,
+			'n',
+			(v) => Number.isSafeInteger(v) && v > 0,
+			'a whole number above 0',
+		),
+		seconds: readNumber(
+			params,
+			'seconds',
+			(v) => Number.isFinite(v) && v > 0,
+			'a number of seconds above 0',
+		),
+	};
+}

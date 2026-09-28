@@ -1,0 +1,54 @@
+{
+	"name": "sokko3d-workspace",
+	"private": true,
+	"description": "A browser 3D engine for games and heavy 3D apps: Rust and WebAssembly on worker threads, WebGPU and WebGL2, and a TypeScript API with three.js-style names.",
+	"license": "MIT OR Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/sokko3d/sokko3d.git"
+	},
+	"packageManager": "bun@1.3.14",
+	"workspaces": [
+		"packages/*",
+		"tests",
+		"bench"
+	],
+	"scripts": {
+		"docs": "bun tools/gen-docs.ts",
+		"docs:check": "bun tools/gen-docs.ts --check && bun tools/hooks/check-commands.ts",
+		"docs:style": "bun tools/hooks/check-docs-style.ts --all",
+		"skills": "bun tools/skills.ts sync && bun tools/skills.ts check",
+		"skills:check": "bun tools/skills.ts check",
+		"build": "bun tools/build-wasm.ts",
+		"build:check-size": "bun tools/build-wasm.ts --check-size",
+		"shaders": "cargo run -p sokko3d-shaders --bin shader-build",
+		"shaders:check": "cargo run -p sokko3d-shaders --bin shader-build -- --check",
+		"check": "biome check .",
+		"check:fix": "biome check --write .",
+		"typecheck": "tsc -p tsconfig.json && tsc -p packages/engine && tsc -p tests/pages && tsc -p bench && tsc -p bench/tsconfig.node.json",
+		"test": "bun test tools packages bench/scenes bench/pages bench/lib tests/lib",
+		"prepare": "husky",
+		"test:browser": "bun run --cwd tests test",
+		"test:real-browsers": "bun tests/real-browsers.ts",
+		"devices": "bun tests/real-browsers.ts --allow-no-webgpu --android chrome,brave --lan ipad-safari,ipad-brave",
+		"test:bench": "bun run --cwd bench test",
+		"parity": "bun bench/parity.ts",
+		"bench:run": "bun bench/run.ts",
+		"bench:allocation": "bun bench/allocation.ts",
+		"readme-media": "bun bench/readme-media.ts",
+		"dev": "vite",
+		"dev-cert": "bun tools/dev-cert.ts",
+		"android": "adb reverse tcp:5173 tcp:5173"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.5.14",
+		"@commitlint/cli": "^21.2.3",
+		"@commitlint/config-conventional": "^21.2.3",
+		"@sokko3d/vite-plugin": "workspace:*",
+		"@types/bun": "^1.3.0",
+		"binaryen": "132.0.0",
+		"husky": "^9.1.7",
+		"typescript": "~6.0.3",
+		"vite": "8.3.1"
+	}
+}
