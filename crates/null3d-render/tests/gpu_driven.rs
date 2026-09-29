@@ -6,6 +6,7 @@ mod common;
 use common::{BATCH_ROWS, SCENE_CAPACITY, World, count};
 use null3d_gpu::drawlist::Op;
 use null3d_gpu::mock::MockBackend;
+use null3d_render::frame::FrameBuilder;
 
 const MATRIX_BYTES: u32 = 48;
 
@@ -26,7 +27,9 @@ fn the_first_frame_creates_everything_and_a_valid_frame_replays() {
     // nowhere.
     assert_eq!(count(&commands, Op::DrawIndexedIndirect), 3);
     assert_eq!(count(&commands, Op::ExecuteBundles), 1);
-    // The first frame uploads every matrix: the scene's slots, then the batch's rows.
+    // The first frame uploads every matrix in use: the scene's slots up to the highest one used
+    // (slot 0 is never used, then the camera and four objects), then the batch's active rows at
+    // their place after every scene slot.
     let sources = SCENE_CAPACITY + 1 + BATCH_ROWS;
     let dispatch = commands.iter().find(|(op, _)| *op == Op::Dispatch).unwrap();
     assert_eq!(dispatch.1, vec![sources.div_ceil(128), 1, 1]);
@@ -36,7 +39,7 @@ fn the_first_frame_creates_everything_and_a_valid_frame_replays() {
         .map(|(_, o)| o)
         .collect();
     assert_eq!(matrix_writes.len(), 2);
-    assert_eq!(matrix_writes[0][3], (SCENE_CAPACITY + 1) * MATRIX_BYTES);
+    assert_eq!(matrix_writes[0][3], 6 * MATRIX_BYTES);
     assert_eq!(matrix_writes[1][1], (SCENE_CAPACITY + 1) * MATRIX_BYTES);
     assert_eq!(matrix_writes[1][3], BATCH_ROWS * MATRIX_BYTES);
 }
@@ -104,6 +107,23 @@ fn a_steady_frame_uploads_only_changed_rows_and_replays_the_same_bundle() {
     assert_eq!(matrix_writes[0][1], (SCENE_CAPACITY + 1) * MATRIX_BYTES);
     assert_eq!(matrix_writes[0][3], BATCH_ROWS * MATRIX_BYTES);
     assert_eq!(count(&commands, Op::ExecuteBundles), 1);
+
+    // A moved camera changes its world matrix, but it draws nothing, so nothing uploads for it.
+    world.frame = 3;
+    world.scene.begin_frame(3);
+    world
+        .scene
+        .set_position(world.camera, [0.0, 0.5, 20.0])
+        .unwrap();
+    world.record(false);
+    mock.replay(world.renderer.list(3).words()).unwrap();
+    let scene_writes = world
+        .commands()
+        .into_iter()
+        .filter(|(op, o)| *op == Op::WriteBuffer && o[0] == 4)
+        .filter(|(_, o)| o[1] < (SCENE_CAPACITY + 1) * MATRIX_BYTES)
+        .count();
+    assert_eq!(scene_writes, 0);
 }
 
 #[test]
@@ -230,9 +250,8 @@ fn a_new_active_count_rewrites_the_rows_without_a_rebuild() {
 #[test]
 fn the_source_limit_follows_the_device_storage_binding() {
     use null3d_gpu::drawlist::sizes;
-    use null3d_render::gpu_driven::{
-        MAX_USEFUL_BINDING_BYTES, PORTABLE_MAX_SOURCES, grown_size, max_sources,
-    };
+    use null3d_render::frame::grown_size;
+    use null3d_render::gpu_driven::{MAX_USEFUL_BINDING_BYTES, PORTABLE_MAX_SOURCES, max_sources};
 
     // Every device: WebGPU's default binding holds the instances of 2,097,152 sources.
     let portable = sizes::PORTABLE_STORAGE_BINDING_BYTES;
@@ -259,7 +278,8 @@ fn the_source_limit_follows_the_device_storage_binding() {
 #[test]
 fn a_scene_past_the_device_limit_is_refused_with_that_limit() {
     use null3d_gpu::drawlist::sizes;
-    use null3d_render::gpu_driven::{RecordError, RendererConfig};
+    use null3d_render::frame::RecordError;
+    use null3d_render::gpu_driven::RendererConfig;
 
     let device = |sources: u32| RendererConfig {
         storage_binding_bytes: sources * sizes::INSTANCE_STRIDE,
@@ -295,6 +315,7 @@ fn pipelines_follow_the_shading_model_and_objects_sharing_a_mesh_and_material_sh
     let lit = |world: &mut World, shade: f32| {
         world
             .renderer
+            .settings_mut()
             .materials_mut()
             .create(Shading::Lit, [shade, 0.5, 0.5, 1.0])
             .unwrap()
