@@ -3,12 +3,22 @@ import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from '../real-browsers.ts';
-import { checksPlan, judge, NONE_MISSING, PLANS, parityPlan } from './plans.ts';
+import { benchPlan, checksPlan, judge, NONE_MISSING, PLANS, parityPlan } from './plans.ts';
 
 /** A browser may lack WebGPU, and must have WebGL2. */
 const NO_WEBGPU = { webgpu: true, webgl2: false };
 
-import { batchTimeoutMs, type ItemResult, runName, turnBatches } from './runs.ts';
+import { RUNS_DIR } from './report-collector.ts';
+import {
+	batchTimeoutMs,
+	type ItemResult,
+	quietLimitMs,
+	runName,
+	turnBatches,
+	waitForRunners,
+	writePlan,
+	writeRunnerFile,
+} from './runs.ts';
 
 describe('turnBatches', () => {
 	it('lets one browser per device run at a time, in the order given', () => {
@@ -23,6 +33,32 @@ describe('turnBatches', () => {
 			['mac-safari', 'sm-s926b-chrome', 'ipad-safari'],
 			['mac-brave-browser', 'sm-s926b-chrome-beta'],
 		]);
+	});
+});
+
+describe('waitForRunners', () => {
+	it('gives up on a runner page that started and then went quiet, as when its tab closed', async () => {
+		const run = `${runName('test')}-wait-${process.pid}`;
+		const plan = writePlan(run, [{ id: 'a', path: '/a', timeoutSeconds: 1, check: {} }]);
+		try {
+			writeRunnerFile(run, 'quiet-phone', 'device', {});
+			writeRunnerFile(run, 'done-phone', 'device', {});
+			writeRunnerFile(run, 'done-phone', 'done', {});
+			const quiet: string[] = [];
+			const finished = await waitForRunners(plan, ['quiet-phone', 'done-phone'], {
+				quietMs: 50,
+				onQuiet: (runner) => quiet.push(runner),
+			});
+			expect(finished).toEqual(['done-phone']);
+			expect(quiet).toEqual(['quiet-phone']);
+		} finally {
+			rmSync(join(RUNS_DIR, run), { recursive: true, force: true });
+		}
+	});
+
+	it('allows the slowest page its timeout, and time to load the next page', () => {
+		const item = (timeoutSeconds: number) => ({ id: 'a', path: '/a', timeoutSeconds, check: {} });
+		expect(quietLimitMs({ run: 'r', createdAt: '', items: [item(95), item(30)] })).toBe(125_000);
 	});
 });
 
@@ -231,6 +267,27 @@ describe('the parity plan', () => {
 	});
 });
 
+describe('the bench plan', () => {
+	it('runs each page five times by default, and the pages take turns run by run', () => {
+		const items = benchPlan();
+		expect(items).toHaveLength(25);
+		expect(items.slice(0, 5).map((item) => item.id)).toEqual([
+			'bench-s1-null3d-webgpu-1',
+			'bench-s1-null3d-webgl2-1',
+			'bench-s1-threejs-webgpu-1',
+			'bench-s1-threejs-webgl-1',
+			'bench-s1-scene-code-1',
+		]);
+		expect(items.at(-1)?.id).toBe('bench-s1-scene-code-5');
+	});
+
+	it('takes the number of runs and the instance count', () => {
+		const items = benchPlan({ runs: 2, count: 1000 });
+		expect(items).toHaveLength(10);
+		expect(items.every((item) => item.path.endsWith('n=1000'))).toBe(true);
+	});
+});
+
 describe('parseArgs', () => {
 	it('reads the plan, the flags, the device lists and the macOS apps', () => {
 		expect(
@@ -254,7 +311,10 @@ describe('parseArgs', () => {
 			webgl2: true,
 		});
 		expect(parseArgs(['--plan', 'bench', '--n', '30000', 'Safari']).count).toBe(30000);
+		expect(parseArgs(['--plan', 'bench', '--runs', '3', 'Safari']).runs).toBe(3);
+		expect(parseArgs(['--plan', 'scale', '--android', 'chrome']).plan).toBe('scale');
 		expect(() => parseArgs(['--n', 'many'])).toThrow('--n: use a whole number above 0');
+		expect(() => parseArgs(['--runs', '0'])).toThrow('--runs: use a whole number above 0');
 		expect(() => parseArgs(['--plan', 'nothing'])).toThrow('no plan named nothing');
 		expect(() => parseArgs(['--fast'])).toThrow('unknown option --fast');
 	});
