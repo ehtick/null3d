@@ -219,14 +219,25 @@ pub fn init_engine(
     capabilities: u32,
     max_texture_size: u32,
 ) -> u32 {
-    // SAFETY: as in `with_engine`; this is the first call on the sketch thread.
+    // SAFETY: as in `with_engine`; no other call on the sketch thread runs while this one does.
     let cell = unsafe { &mut *ENGINE.0.get() };
-    let jobs = JobSystem::with_config(JobConfig {
-        workers: job_workers,
-        clock: Some(performance_now),
-        ..JobConfig::default()
-    });
-    if cell.is_some() || JOBS.set(jobs).is_err() {
+    if cell.is_some() {
+        return fail(codes::NOT_READY, [1, 0]);
+    }
+    // An engine started again in the same instance, as the single-threaded build is, keeps the
+    // job system of the one before when it has the same workers.
+    let reusable = |jobs: &JobSystem| jobs.worker_count() == job_workers && !jobs.is_shut_down();
+    let jobs_ready = match JOBS.get() {
+        Some(jobs) => reusable(jobs),
+        None => JOBS
+            .set(JobSystem::with_config(JobConfig {
+                workers: job_workers,
+                clock: Some(performance_now),
+                ..JobConfig::default()
+            }))
+            .is_ok(),
+    };
+    if !jobs_ready {
         return fail(codes::NOT_READY, [1, 0]);
     }
     *cell = Some(Engine {
@@ -254,6 +265,16 @@ pub fn init_engine(
         rebuilt: false,
     });
     0
+}
+
+// The page calls this when it stops an engine that runs on the page's own thread, as the
+// single-threaded build does, because the page keeps that build's instance for the next engine.
+// Its doc comment stays short: wasm-bindgen copies it into the glue that every page downloads.
+/// Drops the engine, so that `initEngine` can create another.
+#[wasm_bindgen(js_name = destroyEngine)]
+pub fn destroy_engine() {
+    // SAFETY: as in `with_engine`; the sketch thread calls it after the engine's last step.
+    unsafe { *ENGINE.0.get() = None };
 }
 
 /// Serves the job system on a job worker until `shutdownJobs`. It first waits for the sketch
