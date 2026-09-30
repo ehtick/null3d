@@ -92,6 +92,7 @@ async function start(
 			depth: 'reversed',
 			parallelCompile: true,
 			shaderBits: 0,
+			cellCulling: true,
 		},
 		capabilities: CAPABILITIES,
 		quality: { preset: 'medium', settings: { maxPixelRatio: 2 } },
