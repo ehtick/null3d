@@ -77,7 +77,7 @@ The lower of `presentedFps` and `completedFps` is the rate users see. The engine
 | High "replay" or draw calls | Too many mesh and material combinations | Share materials; pack textures into arrays with `bunx @null3d/cli assets` (0.2); merge small static meshes offline |
 | GPU time high, CPU low | Pixels or shader cost | Lower `maxPixelRatio`; cheaper materials; fewer shadowed lights; avoid large transparent areas |
 | Hitch when something new appears, or it appears a moment late | A rebuild (`rebuilds` above zero), or a pipeline build (`pipelines` above zero) | Create materials and objects during loading; create a later stage hidden, `await scene.warmUp()`, then show it |
-| Hitch while loading during play | Uploads and decoding | Load before play, or stream smaller files; the per-frame upload budget spreads uploads |
+| Hitch while loading during play | Uploads and decoding | Load before play, or stream smaller files; the per-frame upload budget spreads uploads, and `quality.set({ uploadBytesPerFrame })` lowers it |
 | Frame rate drops after a few minutes on a phone | Heat | Aim for 70% of the budget; test 10-minute runs. The governor steps quality down later in 0.1 |
 
 ## 5. Phones and tablets
